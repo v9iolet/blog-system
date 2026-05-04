@@ -63,7 +63,7 @@ blog:
     refresh-expiration: 604800000  # 7天
   ai:
     qianfan:
-      api-key: ${QIANFAN_API_KEY:bce-v3/ALTAK-HSnymicmyG08jaQ0uvTYk/1ac246ed1f111ae6b9408c3762617090eb1fc10c}
+      api-key: ${QIANFAN_API_KEY:}
       # 需要替换为你的应用ID，格式: https://qianfan.baidubce.com/v2/app/{app_id}
       # 或使用模型端点: https://qianfan.baidubce.com/v2/chat/completions
       model-url: https://qianfan.baidubce.com/v2/chat/completions
