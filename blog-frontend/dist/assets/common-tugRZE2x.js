@@ -1,0 +1,1 @@
+import{ab as e}from"./index-C7jSgam6.js";const o=()=>e.get("/categories"),m=()=>e.get("/tags"),n=t=>e.get(`/comments/article/${t}`),g=t=>e.post("/comments",t),r=t=>e.post("/messages",t),c=t=>{const a=new FormData;return a.append("file",t),e.post("/upload/image",a,{headers:{"Content-Type":"multipart/form-data"}})};export{m as a,n as b,g as c,o as g,r as l,c as u};

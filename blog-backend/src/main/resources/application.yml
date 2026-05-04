@@ -1,0 +1,70 @@
+server:
+  port: 8088
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/blog_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 2248779259@qq.com  # 请替换为你的QQ邮箱
+    password: dkjjvayfogwyeaie  # 请替换为QQ邮箱授权码
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:  # 如果Redis设置了密码，请填写
+      database: 0
+      timeout: 3000ms
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    # 关闭 SQL 日志输出，使用 slf4j 日志
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.blog: INFO
+    com.blog.mapper: WARN  # MyBatis Mapper 日志级别设为 WARN，不输出 SQL
+    org.springframework.web: WARN
+    org.mybatis: WARN
+    com.zaxxer.hikari: WARN  # HikariCP 连接池日志
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+blog:
+  jwt:
+    secret: YmxvZy1zeXN0ZW0tc2VjcmV0LWtleS1mb3Itand0LXRva2VuLTIwMjY=
+    expiration: 86400000  # 24小时
+    refresh-expiration: 604800000  # 7天
+  ai:
+    qianfan:
+      api-key: ${QIANFAN_API_KEY:bce-v3/ALTAK-HSnymicmyG08jaQ0uvTYk/1ac246ed1f111ae6b9408c3762617090eb1fc10c}
+      # 需要替换为你的应用ID，格式: https://qianfan.baidubce.com/v2/app/{app_id}
+      # 或使用模型端点: https://qianfan.baidubce.com/v2/chat/completions
+      model-url: https://qianfan.baidubce.com/v2/chat/completions
+      enabled: true

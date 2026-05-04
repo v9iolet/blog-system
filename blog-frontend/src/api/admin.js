@@ -1,0 +1,17 @@
+import request from '@/utils/request'
+
+export const getDashboard = () => request.get('/admin/dashboard')
+export const getUsers = (params) => request.get('/admin/users', { params })
+export const toggleUserStatus = (id, status) => request.put(`/admin/users/${id}/status`, { status })
+export const getAdminArticles = (params) => request.get('/admin/articles', { params })
+export const reviewAdminArticle = (id, data) => request.put(`/admin/articles/${id}/review`, data)
+export const deleteAdminArticle = (id) => request.delete(`/admin/articles/${id}`)
+export const createCategory = (data) => request.post('/admin/categories', data)
+export const deleteCategory = (id) => request.delete(`/admin/categories/${id}`)
+export const createTag = (data) => request.post('/admin/tags', data)
+export const deleteTag = (id) => request.delete(`/admin/tags/${id}`)
+export const getAdminComments = (params) => request.get('/admin/comments', { params })
+export const deleteAdminComment = (id) => request.delete(`/admin/comments/${id}`)
+export const getMessages = (params) => request.get('/admin/messages', { params })
+export const replyMessage = (id, reply) => request.put(`/admin/messages/${id}/reply`, { reply })
+export const getLogs = (params) => request.get('/admin/logs', { params })
