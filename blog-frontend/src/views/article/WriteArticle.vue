@@ -4,7 +4,7 @@
       <div class="editor-head">
         <div>
           <h2>{{ isEdit ? '编辑文章' : '写文章' }}</h2>
-          <p>在统一的蓝白科技创作界面中整理标题、摘要、分类与正文。发布后的文章需经平台审核通过后才会展示在首页。</p>
+          <p>在统一的蓝白科技创作界面中整理标题、分类与正文。可使用 AI 辅助生成文章草稿，发布后的文章需经平台审核通过后才会展示在首页。</p>
         </div>
         <div class="editor-status">
           <span>{{ isEdit ? '编辑模式' : '创作模式' }}</span>
@@ -14,20 +14,6 @@
       <el-form :model="form" label-position="top" class="editor-form">
         <el-form-item label="标题">
           <el-input v-model="form.title" placeholder="请输入文章标题" size="large" />
-        </el-form-item>
-        <el-form-item label="摘要">
-          <div class="summary-field">
-            <el-input v-model="form.summary" type="textarea" :rows="3" placeholder="文章摘要（可选）" />
-            <el-button 
-              type="primary" 
-              :icon="MagicStick" 
-              @click="handleGenerateSummary" 
-              :loading="generatingSummary"
-              class="ai-button"
-            >
-              {{ generatingSummary ? 'AI 生成中...' : 'AI 生成摘要' }}
-            </el-button>
-          </div>
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -45,6 +31,22 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="摘要">
+          <el-input v-model="form.summary" type="textarea" :rows="2" placeholder="文章摘要（可选，也可发布后由审核生成）" />
+        </el-form-item>
+        <div class="ai-draft-bar">
+          <el-button
+            type="primary"
+            :icon="MagicStick"
+            @click="generatingDraft ? handleCancelDraft() : handleGenerateDraft()"
+            :loading="generatingDraft && false"
+            class="ai-button"
+          >
+            {{ generatingDraft ? '⏹ 停止生成' : '✨ AI 辅助生成草稿' }}
+          </el-button>
+          <span v-if="generatingDraft" class="ai-hint">AI 正在撰写中，内容将实时填充到下方编辑器...</span>
+          <span v-else class="ai-hint">填写标题并选择分类/标签后，点击按钮让 AI 为你撰写文章草稿</span>
+        </div>
         <el-form-item label="封面图">
           <el-input v-model="form.coverImage" placeholder="封面图URL（可选）" />
         </el-form-item>
@@ -67,7 +69,7 @@ import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { createArticle, updateArticle, getArticleDetail, getMyArticleDetail } from '@/api/article'
 import { getCategories, getTags } from '@/api/common'
-import { generateAISummary } from '@/api/ai'
+import { generateDraftStream } from '@/api/ai'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,7 +77,8 @@ const isEdit = computed(() => !!route.params.id)
 const categories = ref([])
 const tags = ref([])
 const submitting = ref(false)
-const generatingSummary = ref(false)
+const generatingDraft = ref(false)
+let abortController = null
 const form = ref({ title: '', content: '', summary: '', coverImage: '', categoryId: null, tagIds: [], status: 0, isTop: 0 })
 
 async function loadData() {
@@ -89,38 +92,59 @@ async function loadData() {
   }
 }
 
-async function handleGenerateSummary() {
-  if (!form.value.title || !form.value.content) {
-    ElMessage.warning('请先填写标题和内容')
+/**
+ * AI 辅助生成草稿
+ * 通过 SSE 流式接收后端返回的 Markdown 内容，实时写入编辑器。
+ */
+async function handleGenerateDraft() {
+  if (!form.value.title) {
+    ElMessage.warning('请先填写文章标题')
     return
   }
 
-  generatingSummary.value = true
+  // 查找已选分类的名称
+  const selectedCategory = categories.value.find(c => c.id === form.value.categoryId)
+  const categoryName = selectedCategory ? selectedCategory.name : ''
+  // 查找已选标签的名称列表
+  const tagNames = form.value.tagIds
+    .map(id => tags.value.find(t => t.id === id)?.name)
+    .filter(Boolean)
+
+  // 清空内容区域，准备接收流式数据
+  form.value.content = ''
+  generatingDraft.value = true
+  abortController = new AbortController()
+
   try {
-    const res = await generateAISummary({
-      title: form.value.title,
-      content: form.value.content,
-      summaryLength: 150
-    })
-    
-    if (res.data.summary) {
-      form.value.summary = res.data.summary
-      
-      if (res.data.fromCache) {
-        ElMessage.success('已生成摘要（来自缓存）')
-      } else {
-        ElMessage.success('AI 摘要生成成功！')
-      }
-      
-      // 如果有推荐的关键词，可以提示用户
-      if (res.data.keywords && res.data.keywords.length > 0) {
-        console.log('推荐关键词:', res.data.keywords)
-      }
-    }
+    await generateDraftStream(
+      { title: form.value.title, categoryName, tagNames },
+      (chunk) => {
+        // 每收到一段文本，追加到编辑器内容末尾
+        form.value.content += chunk
+      },
+      abortController.signal
+    )
+    // 生成完成后清理格式：去除超过2个连续空行
+    form.value.content = form.value.content.replace(/\n{3,}/g, '\n\n').trim()
+    ElMessage.success('AI 草稿生成完成！')
   } catch (error) {
-    ElMessage.error('生成摘要失败: ' + (error.message || '请稍后重试'))
+    if (error.name === 'AbortError') {
+      ElMessage.info('已停止生成')
+    } else {
+      ElMessage.error('生成草稿失败: ' + (error.message || '请稍后重试'))
+    }
   } finally {
-    generatingSummary.value = false
+    generatingDraft.value = false
+    abortController = null
+  }
+}
+
+/**
+ * 中止正在进行的 AI 生成
+ */
+function handleCancelDraft() {
+  if (abortController) {
+    abortController.abort()
   }
 }
 
@@ -184,14 +208,15 @@ onMounted(loadData)
   margin-top: 6px;
 }
 
-.summary-field {
+.ai-draft-bar {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-
-  .el-textarea {
-    flex: 1;
-  }
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.06), rgba(118, 75, 162, 0.06));
+  border: 1px solid rgba(102, 126, 234, 0.15);
 
   .ai-button {
     flex-shrink: 0;
@@ -210,6 +235,11 @@ onMounted(loadData)
       transform: translateY(0);
     }
   }
+
+  .ai-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
 }
 
 @media (max-width: 768px) {
@@ -227,8 +257,9 @@ onMounted(loadData)
     font-size: 28px;
   }
 
-  .summary-field {
+  .ai-draft-bar {
     flex-direction: column;
+    align-items: flex-start;
 
     .ai-button {
       width: 100%;

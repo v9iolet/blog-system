@@ -17,6 +17,7 @@
         <java.version>17</java.version>
         <mybatis-plus.version>3.5.6</mybatis-plus.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <spring-ai.version>1.0.0-M6</spring-ai.version>
     </properties>
 
     <dependencies>
@@ -90,13 +91,22 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- HTTP 客户端用于调用百度千帆 API -->
+        <!-- Spring AI OpenAI 兼容接口（百度千帆 deepseek-v4-flash） -->
         <dependency>
-            <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>4.12.0</version>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <version>${spring-ai.version}</version>
         </dependency>
     </dependencies>
+
+    <!-- Spring AI 包不在阿里云镜像中，需从 Maven Central 直接拉取 -->
+    <repositories>
+        <repository>
+            <id>maven-central-direct</id>
+            <name>Maven Central (direct)</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>
