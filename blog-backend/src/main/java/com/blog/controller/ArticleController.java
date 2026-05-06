@@ -8,6 +8,7 @@ import com.blog.service.ArticleService;
 import com.blog.util.Result;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,39 +38,39 @@ public class ArticleController {
 
     @GetMapping("/mine/{id}")
     public Result<Article> myDetail(Authentication auth, @PathVariable Long id) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         return Result.success(articleService.getUserArticleDetail(userId, id));
     }
 
     @GetMapping("/notifications")
     public Result<List<Message>> notifications(Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         return Result.success(articleService.getUserNotifications(userId));
     }
 
     @PutMapping("/notifications/{messageId}/read")
     public Result<Void> markNotificationRead(Authentication auth, @PathVariable Long messageId) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         articleService.markNotificationRead(userId, messageId);
         return Result.success();
     }
 
     @PostMapping
     public Result<Long> create(Authentication auth, @Valid @RequestBody ArticleDTO dto) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         return Result.success(articleService.createArticle(userId, dto));
     }
 
     @PutMapping
     public Result<Void> update(Authentication auth, @Valid @RequestBody ArticleDTO dto) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         articleService.updateArticle(userId, dto);
         return Result.success();
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(Authentication auth, @PathVariable Long id) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         articleService.deleteArticle(userId, id);
         return Result.success();
     }
@@ -78,5 +79,12 @@ public class ArticleController {
     public Result<Void> like(@PathVariable Long id) {
         articleService.likeArticle(id);
         return Result.success();
+    }
+
+    private Long requireUserId(Authentication auth) {
+        if (auth == null || !(auth.getPrincipal() instanceof Long userId)) {
+            throw new AuthenticationCredentialsNotFoundException("请先登录");
+        }
+        return userId;
     }
 }

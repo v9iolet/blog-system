@@ -35,6 +35,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/articles/mine/**", "/api/articles/notifications").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/articles/notifications/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/user/profile").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/user/profile", "/api/user/password").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/articles/**", "/api/categories/**",
                         "/api/tags/**", "/api/comments/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/messages").permitAll()

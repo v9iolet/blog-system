@@ -4,6 +4,7 @@ import com.blog.util.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,6 +31,12 @@ public class GlobalExceptionHandler {
                 .map(f -> f.getDefaultMessage())
                 .reduce((a, b) -> a + "; " + b).orElse("参数错误");
         return Result.error(400, msg);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<?> handleAuthentication(AuthenticationException e) {
+        return Result.error(401, "请先登录");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

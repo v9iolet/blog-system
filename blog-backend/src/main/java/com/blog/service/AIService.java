@@ -37,6 +37,7 @@ public class AIService {
 
     private static final String CACHE_PREFIX = "ai:summary:";
     private static final long CACHE_EXPIRE_DAYS = 30;
+    private static final String TOKEN_CACHE_KEY = "ai:qianfan:access_token";
 
     /**
      * 生成文章摘要
@@ -78,38 +79,134 @@ public class AIService {
     }
 
     /**
+     * 获取百度千帆 access_token
+     */
+    private String getAccessToken() throws IOException {
+        // 先从缓存获取
+        String cachedToken = redisTemplate.opsForValue().get(TOKEN_CACHE_KEY);
+        if (StrUtil.isNotBlank(cachedToken)) {
+            log.debug("从缓存获取 access_token");
+            return cachedToken;
+        }
+
+        String ak, sk;
+
+        // 优先使用独立的 accessKey 和 secretKey
+        if (StrUtil.isNotBlank(qianfanConfig.getAccessKey())
+                && StrUtil.isNotBlank(qianfanConfig.getSecretKey())) {
+            ak = qianfanConfig.getAccessKey();
+            sk = qianfanConfig.getSecretKey();
+            log.info("使用独立的 AccessKey 和 SecretKey");
+        }
+        // 否则尝试从 apiKey 中解析
+        else if (StrUtil.isNotBlank(qianfanConfig.getApiKey())) {
+            String apiKey = qianfanConfig.getApiKey();
+            if (!apiKey.contains("/")) {
+                throw new IOException("API Key 格式不正确，应为 bce-v3/AK/SK 格式，或配置独立的 accessKey 和 secretKey");
+            }
+
+            // API Key 格式: bce-v3/ACCESS_KEY_ID/SECRET_ACCESS_KEY
+            String[] parts = apiKey.split("/");
+            if (parts.length < 3) {
+                throw new IOException("API Key 格式不正确，应为 bce-v3/AK/SK 格式，或配置独立的 accessKey 和 secretKey");
+            }
+
+            ak = parts[1];
+            sk = parts[2];
+            log.info("从 apiKey 中解析 AK 和 SK");
+        } else {
+            throw new IOException("未配置百度千帆的认证信息，请配置 accessKey 和 secretKey，或 apiKey");
+        }
+
+        log.info("准备获取 access_token，AK: {}", maskAk(ak));
+
+        // 调用获取 access_token 的接口
+        String tokenUrl = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=" + ak + "&client_secret=" + sk;
+
+        Request request = new Request.Builder()
+                .url(tokenUrl)
+                .get()
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String errorBody = response.body() != null ? response.body().string() : "无响应体";
+                log.error("获取 access_token 失败: {} - {}, 响应: {}", response.code(), response.message(), errorBody);
+                throw new IOException("获取 access_token 失败: " + response.code() + " - " + response.message());
+            }
+
+            String responseBody = response.body().string();
+            log.debug("获取 access_token 响应: {}", responseBody);
+
+            JSONObject jsonResponse = JSONUtil.parseObj(responseBody);
+
+            if (jsonResponse.containsKey("error")) {
+                String error = jsonResponse.getStr("error", "未知错误");
+                String errorDesc = jsonResponse.getStr("error_description", "");
+                log.error("获取 access_token 错误: {} - {}", error, errorDesc);
+                throw new IOException("获取 access_token 失败: " + error + " - " + errorDesc);
+            }
+
+            String accessToken = jsonResponse.getStr("access_token");
+            if (StrUtil.isBlank(accessToken)) {
+                throw new IOException("无法从响应中获取 access_token");
+            }
+
+            // 缓存 access_token（有效期通常为 30 天）
+            Long expiresIn = jsonResponse.getLong("expires_in", 2592000L);
+            redisTemplate.opsForValue().set(TOKEN_CACHE_KEY, accessToken, expiresIn, TimeUnit.SECONDS);
+
+            log.info("成功获取并缓存 access_token，有效期: {} 秒", expiresIn);
+            return accessToken;
+        }
+    }
+
+    /**
+     * 隐藏 AK 的部分字符用于日志输出
+     */
+    private String maskAk(String ak) {
+        if (StrUtil.isBlank(ak) || ak.length() < 8) {
+            return "***";
+        }
+        return ak.substring(0, 4) + "****" + ak.substring(ak.length() - 4);
+    }
+
+    /**
      * 调用百度千帆 ERNIE 4.5 Turbo 模型
      */
     private String callErnieModel(AISummaryRequest request) throws IOException {
+        // 获取 access_token
+        String accessToken = getAccessToken();
+
         // 构建提示词
         String userPrompt = buildPrompt(request);
-        
+
         // 构建请求体 - 符合百度千帆 v2 API 格式
         JSONObject requestBody = new JSONObject();
-        
+
         // 构建 messages 数组
         JSONArray messages = new JSONArray();
-        
+
         // 用户消息
         JSONObject userMessage = new JSONObject();
         userMessage.set("role", "user");
         userMessage.set("content", userPrompt);
         messages.add(userMessage);
-        
+
         requestBody.set("messages", messages);
         requestBody.set("model", "ernie-4.5-turbo");  // 指定模型
         requestBody.set("temperature", 0.3);  // 较低的温度，使输出更确定
         requestBody.set("top_p", 0.8);
         requestBody.set("max_tokens", 500);  // 限制输出长度
-        
+
         log.info("调用 ERNIE API，URL: {}", qianfanConfig.getModelUrl());
         log.info("请求体: {}", requestBody.toString());
-        
-        // 构建请求
+
+        // 构建请求，使用 Bearer token 认证
         Request httpRequest = new Request.Builder()
                 .url(qianfanConfig.getModelUrl())
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", qianfanConfig.getApiKey())
+                .addHeader("Authorization", "Bearer " + accessToken)
                 .post(RequestBody.create(
                         requestBody.toString(),
                         MediaType.parse("application/json")
@@ -121,15 +218,22 @@ public class AIService {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "无响应体";
                 log.error("API 请求失败: {} - {}, 响应: {}", response.code(), response.message(), errorBody);
+
+                // 如果是 401 错误，可能是 token 过期，清除缓存
+                if (response.code() == 401) {
+                    redisTemplate.delete(TOKEN_CACHE_KEY);
+                    log.warn("access_token 可能已过期，已清除缓存");
+                }
+
                 throw new IOException("请求失败: " + response.code() + " - " + response.message());
             }
 
             String responseBody = response.body().string();
             log.info("百度千帆 ERNIE API 响应: {}", responseBody);
-            
+
             // 解析响应
             JSONObject jsonResponse = JSONUtil.parseObj(responseBody);
-            
+
             // 百度千帆 v2 API 响应格式: {"choices": [{"message": {"content": "..."}}]}
             if (jsonResponse.containsKey("choices")) {
                 JSONArray choices = jsonResponse.getJSONArray("choices");
@@ -144,12 +248,12 @@ public class AIService {
             // 兼容旧格式
             else if (jsonResponse.containsKey("result")) {
                 return jsonResponse.getStr("result").trim();
-            } 
+            }
             else if (jsonResponse.containsKey("error_code")) {
                 String errorMsg = jsonResponse.getStr("error_msg", "未知错误");
                 throw new IOException("API 返回错误: " + errorMsg);
-            } 
-            
+            }
+
             throw new IOException("无法解析 API 响应: " + responseBody);
         }
     }

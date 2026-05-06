@@ -4,6 +4,7 @@ import com.blog.entity.Comment;
 import com.blog.service.CommentService;
 import com.blog.util.Result;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,7 +25,7 @@ public class CommentController {
 
     @PostMapping
     public Result<Void> addComment(Authentication auth, @RequestBody Map<String, Object> body) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         Long articleId = Long.valueOf(body.get("articleId").toString());
         String content = body.get("content").toString();
         Long parentId = body.containsKey("parentId") && body.get("parentId") != null
@@ -35,8 +36,15 @@ public class CommentController {
 
     @DeleteMapping("/{id}")
     public Result<Void> deleteComment(Authentication auth, @PathVariable Long id) {
-        Long userId = (Long) auth.getPrincipal();
+        Long userId = requireUserId(auth);
         commentService.deleteComment(userId, id);
         return Result.success();
+    }
+
+    private Long requireUserId(Authentication auth) {
+        if (auth == null || !(auth.getPrincipal() instanceof Long userId)) {
+            throw new AuthenticationCredentialsNotFoundException("请先登录");
+        }
+        return userId;
     }
 }

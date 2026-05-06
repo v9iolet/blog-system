@@ -63,6 +63,11 @@ blog:
     refresh-expiration: 604800000  # 7天
   ai:
     qianfan:
-      api-key: ${QIANFAN_API_KEY:bce-v3/ALTAK-HSnymicmyG08jaQ0uvTYk/1ac246ed1f111ae6b9408c3762617090eb1fc10c}
-      model-url: https://qianfan.baidubce.com/v2/chat/ernie-4.5-turbo
+      # 百度千帆 API 配置（推荐方式：使用独立的 accessKey 和 secretKey）
+      access-key: ${QIANFAN_ACCESS_KEY:ALTAKrCc7rvpP89iRjykMnJ8Il}
+      secret-key: ${QIANFAN_SECRET_KEY:598b067cd9454c87b6806964f74820e4}
+      # 旧格式兼容（可选）：bce-v3/ACCESS_KEY_ID/SECRET_ACCESS_KEY
+      api-key: ${QIANFAN_API_KEY:}
+      # ERNIE 模型 API 地址
+      model-url: https://qianfan.baidubce.com/v2/chat/completions
       enabled: true

@@ -11,6 +11,7 @@ import com.blog.service.StatsService;
 import com.blog.util.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -71,7 +72,7 @@ public class AdminController {
     public Result<Void> reviewArticle(Authentication auth,
                                       @PathVariable Long id,
                                       @RequestBody Map<String, Object> body) {
-        Long adminId = (Long) auth.getPrincipal();
+        Long adminId = requireUserId(auth);
         Integer reviewStatus = body.get("reviewStatus") == null ? null : Integer.parseInt(body.get("reviewStatus").toString());
         String reviewReason = body.get("reviewReason") == null ? null : body.get("reviewReason").toString();
         articleService.reviewArticle(adminId, id, reviewStatus, reviewReason);
@@ -147,5 +148,12 @@ public class AdminController {
             @RequestParam(defaultValue = "10") int size) {
         return Result.success(sysLogMapper.selectPage(new Page<>(page, size),
                 new LambdaQueryWrapper<SysLog>().orderByDesc(SysLog::getCreatedAt)));
+    }
+
+    private Long requireUserId(Authentication auth) {
+        if (auth == null || !(auth.getPrincipal() instanceof Long userId)) {
+            throw new AuthenticationCredentialsNotFoundException("请先登录");
+        }
+        return userId;
     }
 }
