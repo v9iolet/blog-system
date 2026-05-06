@@ -30,6 +30,19 @@ spring:
       password:  # 如果Redis设置了密码，请填写
       database: 0
       timeout: 3000ms
+  # Spring AI 配置（调用百度千帆 deepseek-v4-flash）
+  ai:
+    openai:
+      # 百度千帆 API Key（v3 格式：bce-v3/ACCESS_KEY_ID/SECRET_ACCESS_KEY）
+      api-key: ${QIANFAN_API_KEY}
+      # 百度千帆 API 基地址（不含路径）
+      base-url: https://qianfan.baidubce.com
+      chat:
+        # 自定义 completions 路径，覆盖 Spring AI 默认的 /v1/chat/completions
+        completions-path: /v2/chat/completions
+        options:
+          # 调用的模型 ID
+          model: deepseek-v4-flash
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -61,13 +74,3 @@ blog:
     secret: YmxvZy1zeXN0ZW0tc2VjcmV0LWtleS1mb3Itand0LXRva2VuLTIwMjY=
     expiration: 86400000  # 24小时
     refresh-expiration: 604800000  # 7天
-  ai:
-    qianfan:
-      # 百度千帆 API 配置（推荐方式：使用独立的 accessKey 和 secretKey）
-      access-key: ${QIANFAN_ACCESS_KEY:ALTAKrCc7rvpP89iRjykMnJ8Il}
-      secret-key: ${QIANFAN_SECRET_KEY:598b067cd9454c87b6806964f74820e4}
-      # 旧格式兼容（可选）：bce-v3/ACCESS_KEY_ID/SECRET_ACCESS_KEY
-      api-key: ${QIANFAN_API_KEY:}
-      # ERNIE 模型 API 地址
-      model-url: https://qianfan.baidubce.com/v2/chat/completions
-      enabled: true

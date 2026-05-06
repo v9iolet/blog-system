@@ -1,1 +1,0 @@
-import{ab as e}from"./index-C7jSgam6.js";const s=t=>e.get("/articles",{params:t}),a=t=>e.get(`/articles/${t}`),c=t=>e.get(`/articles/mine/${t}`),r=()=>e.get("/articles/notifications"),l=t=>e.put(`/articles/notifications/${t}/read`),o=t=>e.post("/articles",t),n=t=>e.put("/articles",t),g=t=>e.post(`/articles/${t}/like`);export{s as a,a as b,c,o as d,r as g,g as l,l as m,n as u};
